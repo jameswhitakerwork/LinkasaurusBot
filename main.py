@@ -117,10 +117,28 @@ async def share_link(ctx, name_of_project, invite_link, no_invites):
     new_message = await ctx.channel.fetch_message(my_message.id)
     reactions = discord.utils.get(new_message.reactions)
     reactions_count = reactions.count
-  await ctx.channel.send("Congratulations! these people want to join this server using your link.")
+    '''
+    if reactions_count > 0:
+      await my_message.remove_reaction('👍', ctx.author)
+    '''
   joiners = await new_message.reactions[0].users().flatten()
-  for i in range(1, no_invites):
+  await announce_joiners(ctx, name_of_project, invite_link, no_invites, joiners)
+  
+async def announce_joiners(ctx, name_of_project, invite_link, no_invites, joiners):
+  joiners_string = ""
+  for i in range(0, no_invites):
+    joiners_string += joiners[i].mention + ", "
+  joiners_announce_message = discord.Embed(color = 0x2ecc71)
+  joiners_announce_message.set_author(name = 'Linkasaurus Bot')
+  joiners_announce_message.add_field(name="Congratulations! The following people want to use your invite link!", value=f'{joiners_string}')
+  joiners_announce_message = await ctx.channel.send(embed = joiners_announce_message)
+  for i in range(0, no_invites):
     await ctx.channel.send(f'{joiners[i].mention}')
+  joiners_info_message = discord.Embed(color = 0x2ecc71)
+  joiners_announce_message.set_author(name = 'Linkasaurus Bot')
+
+  
+
 
 
 
