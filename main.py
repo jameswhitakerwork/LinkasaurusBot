@@ -105,22 +105,23 @@ async def share_link(ctx, name_of_project, invite_link, no_invites):
 
   ##React to the message
   await my_message.add_reaction('👍')
-  new_message = await channel.fetch_message(my_message.id)
+  new_message = await ctx.channel.fetch_message(my_message.id)
 
   ##Check for reactions
-  users = await new_message.reactions[0].users().flatten()
-  while len(users) < no_invites:
+  reactions = discord.utils.get(new_message.reactions)
+  reactions_count = reactions.count
+
+  while reactions_count < no_invites:
+    await ctx.channel.send(f'There are only {str(reactions_count)} reactions')
     await asyncio.sleep(ticker)
-    users = await new_message.reactions[0].users().flatten()
-  await message.channel.send("Congratulations! these people want to join this server using your link.")
-  
+    new_message = await ctx.channel.fetch_message(my_message.id)
+    reactions = discord.utils.get(new_message.reactions)
+    reactions_count = reactions.count
+  await ctx.channel.send("Congratulations! these people want to join this server using your link.")
+  joiners = await new_message.reactions[0].users().flatten()
+  for i in range(1, no_invites):
+    await ctx.channel.send(f'{joiners[i].mention}')
 
-
-
-@client.event
-async def on_reaction_add(reaction, user):
-  await message.channel.send("user added reaction")
-  print("user added reaction")
 
 
 
