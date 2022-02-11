@@ -93,11 +93,16 @@ def add_user_to_task(invite_link, user):
 @bot.command()
 async def start(message):
   ###Check if balance not already initialized
-  set_balance(message.author, starting_balance)
-  await message.channel.send(
-    "Your account is initialized with {0}".format(starting_balance)
-    )
-  await print_balances(message)
+  if "balances" in db.keys():
+    if str(message.author.id) not in db["balances"].keys():
+      set_balance(message.author, starting_balance)
+      await message.channel.send(
+        "Your account is initialized with {0}".format(starting_balance)
+        )
+    else:
+      await message.channel.send(
+        "Whoops! You have already initialized your bank. Check out !help"
+        )
 
 @bot.command()
 async def bank(message):
