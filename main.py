@@ -28,7 +28,8 @@ starting_balance = 10
 @client.event
 async def on_ready():
   print("logged in as {0.user}".format(client))
-  db["sharing_state"] = 0
+  print(db.keys())
+  db["sharing_state"] = "unpaused"
 
 
 #Database balance adjustments
@@ -139,13 +140,13 @@ async def share_link(ctx, name_of_project, invite_link, no_invites):
 
 
   ##Check none ongoing already:
-  if db["sharing_state"] != 0:
+  if db["sharing_state"] == "paused":
     error_state = "There is already a link being shared. Try again once it has finished"
     await ctx.channel.send(error_state)
   elif user_balance < no_invites:
     error_state = f"You only have {user_balance} points but you need {no_invites}. Join other links to gain more points!"
     await ctx.channel.send(error_state)
-  elif len(invite_link) != 10:
+  elif len(invite_link) != 8:
         error_state = "It seems like your discord link doesn't have the correct amount of characters (8)"
         await ctx.channel.send(error_state)
 
@@ -153,7 +154,7 @@ async def share_link(ctx, name_of_project, invite_link, no_invites):
 
   if error_state == None:
     ##Turn off link sharing for other people
-    db["sharing_state"] = 1
+    db["sharing_state"] = "paused"
     
     ##Announcement
     await ctx.channel.send(f'{ctx.author.mention}')
@@ -192,7 +193,7 @@ async def share_link(ctx, name_of_project, invite_link, no_invites):
     add_balance(joiners, 1)
 
     ##Turn on link sharing for other people
-    db["sharing_state"] = 0
+    db["sharing_state"] = "unpaused"
 
 
 
@@ -229,6 +230,12 @@ async def admin_print_tasks(message):
 async def admin_reset_balances(message):
     reset_all_balances()
     await message.channel.send("All balances have been deleted.")
+
+@bot.command()
+@commands.has_role("Linkasaurus Team")
+async def adjust_db(message, key, value):
+    db[key] = value
+    await message.channel.send(f"{key} set to {value}")
   
 
 
