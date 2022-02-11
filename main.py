@@ -21,7 +21,7 @@ client = discord.Client()
 
 
 #Project variables
-sharing_state=0
+sharing_state= 0
 starting_balance = 10
 
 
@@ -55,11 +55,21 @@ def subtract_balance(users, amount):
         balances[str(user.id)] -= int(amount)
 
 def check_own_balance(user):
+  '''Returns a readable string containing the balance.'''
   if "balances" in db.keys():
     balances = db["balances"]
     if str(user.id) in balances.keys():
       balance = f'{user.mention}, you have {str(balances[str(user.id)])} points in the bank'
     else: balance = "You do not have a bank yet! Try /help"
+  return balance
+
+def check_balance(user):
+  '''Returns the balance as an integer. No balance is returned as None'''
+  if "balances" in db.keys():
+    balances = db["balances"]
+    if str(user.id) in balances.keys():
+      balance = balances[str(user.id)]
+    else: balance = None
   return balance
 
 
@@ -118,50 +128,57 @@ async def share_link(ctx, name_of_project, invite_link, no_invites):
   ###Check points
   ticker=2
   no_invites = int(no_invites)
-  '''
-  give = discord.Embed(color = 0x2ecc71)
-  give.set_author(name = f'GIVEAWAY TIME!', icon_url = 'https://i.imgur.com/VaX0pfM.png')
-  give.add_field(name= f'{ctx.author.name} is giving away: {prize}!', value = f'React with 🎉 to enter!\n Ends in {round(time/60, 2)} minutes!', inline = False)
-  end = datetime.datetime.utcnow() + datetime.timedelta(seconds = time)
-  give.set_footer(text = f'Giveaway ends at {end} UTC!')
-  my_message = await channel.send(embed = give)
-  '''
+  error_state = None
 
-  ##Announcement
-  await ctx.channel.send(f'{ctx.author.mention}')
-  sharelinkmessage = discord.Embed(color = 0x2ecc71)
-  sharelinkmessage.set_author(name = 'Linkasaurus Bot')
-  sharelinkmessage.add_field(
-    name=f'{ctx.author.name} is requesting that {str(no_invites)} people join the {name_of_project} server, using their code https://discord.gg/{invite_link}.',
-    value=f'Each person will recieve one point from {ctx.author.name}. The first {str(no_invites)} to react to this message with a "👍" will get a point!')
-  end = datetime.datetime.utcnow() + datetime.timedelta(seconds = ticker)
-  sharelinkmessage.set_footer(text = f'If there are not enough people by {end} then the request is cancelled.')
-  my_message = await ctx.channel.send(embed = sharelinkmessage)
+  ##Check none ongoing already:
+  if sharing_state != 0:
+    error_state = "There is already a link being shared. Try again once it has finished"
+    await ctx.channel.send(error_state)
+  
+  ##Check points
+  user_balance = check_balance(ctx.author)
+  if user_balance < no_invites:
+    error_state = f"You only have {user_balance} points but you need {no_invites}. Join other links to gain more points!"
+    await ctx.channel.send(error_state)
 
-  ##React to the message
-  await my_message.add_reaction('👍')
-  new_message = await ctx.channel.fetch_message(my_message.id)
 
-  ##Check for reactions
-  reactions = discord.utils.get(new_message.reactions)
-  reactions_count = reactions.count
 
-  while reactions_count < no_invites:
-    await asyncio.sleep(ticker)
+  if error_state == None:
+    ##Announcement
+    await ctx.channel.send(f'{ctx.author.mention}')
+    sharelinkmessage = discord.Embed(color = 0x2ecc71)
+    sharelinkmessage.set_author(name = 'Linkasaurus Bot')
+    sharelinkmessage.add_field(
+      name=f'{ctx.author.name} is requesting that {str(no_invites)} people join the {name_of_project} server, using their code https://discord.gg/{invite_link}.',
+      value=f'Each person will recieve one point from {ctx.author.name}. The first {str(no_invites)} to react to this message with a "👍" will get a point!')
+    end = datetime.datetime.utcnow() + datetime.timedelta(seconds = ticker)
+    sharelinkmessage.set_footer(text = f'If there are not enough people by {end} then the request is cancelled.')
+    my_message = await ctx.channel.send(embed = sharelinkmessage)
+
+    ##React to the message
+    await my_message.add_reaction('👍')
     new_message = await ctx.channel.fetch_message(my_message.id)
-    
+
+    ##Check for reactions
     reactions = discord.utils.get(new_message.reactions)
     reactions_count = reactions.count
-    '''
-    if reactions_count > 0:
-      await my_message.remove_reaction('👍', new_message.author)
-    '''
 
-  ##Announce joiners and make balance adjustments
-  joiners = await new_message.reactions[0].users().flatten()
-  await announce_joiners(ctx, name_of_project, invite_link, no_invites, joiners)
-  subtract_balance([ctx.author], no_invites)
-  add_balance(joiners, 1)
+    while reactions_count < no_invites:
+      await asyncio.sleep(ticker)
+      new_message = await ctx.channel.fetch_message(my_message.id)
+      
+      reactions = discord.utils.get(new_message.reactions)
+      reactions_count = reactions.count
+      '''
+      if reactions_count > 0:
+        await my_message.remove_reaction('👍', new_message.author)
+      '''
+
+    ##Announce joiners and make balance adjustments
+    joiners = await new_message.reactions[0].users().flatten()
+    await announce_joiners(ctx, name_of_project, invite_link, no_invites, joiners)
+    subtract_balance([ctx.author], no_invites)
+    add_balance(joiners, 1)
 
 
 
