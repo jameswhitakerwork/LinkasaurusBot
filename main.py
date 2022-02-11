@@ -21,7 +21,6 @@ client = discord.Client()
 
 
 #Project variables
-sharing_state= 0
 starting_balance = 10
 
 
@@ -29,6 +28,7 @@ starting_balance = 10
 @client.event
 async def on_ready():
   print("logged in as {0.user}".format(client))
+  db["sharing_state"] = 0
 
 
 #Database balance adjustments
@@ -123,27 +123,38 @@ async def bank(message):
 @bot.command()
 @commands.has_role("Linkasaurus")
 async def share_link(ctx, name_of_project, invite_link, no_invites):
-  ###Check none ongoing already
-  ###Validate input
-  ###Check points
+  ##Init variables
   ticker=2
-  no_invites = int(no_invites)
   error_state = None
+  user_balance = check_balance(ctx.author)
+
+
+  ##Validate input
+  try:
+    no_invites = int(no_invites)
+  except:
+    error_state = "Your command was incorrect. Try !help"
+    await ctx.channel.send(error_state)
+
+
 
   ##Check none ongoing already:
-  if sharing_state != 0:
+  if db["sharing_state"] != 0:
     error_state = "There is already a link being shared. Try again once it has finished"
     await ctx.channel.send(error_state)
-  
-  ##Check points
-  user_balance = check_balance(ctx.author)
-  if user_balance < no_invites:
+  elif user_balance < no_invites:
     error_state = f"You only have {user_balance} points but you need {no_invites}. Join other links to gain more points!"
     await ctx.channel.send(error_state)
+  elif len(invite_link) != 10:
+        error_state = "It seems like your discord link doesn't have the correct amount of characters (8)"
+        await ctx.channel.send(error_state)
 
 
 
   if error_state == None:
+    ##Turn off link sharing for other people
+    db["sharing_state"] = 1
+    
     ##Announcement
     await ctx.channel.send(f'{ctx.author.mention}')
     sharelinkmessage = discord.Embed(color = 0x2ecc71)
@@ -179,6 +190,9 @@ async def share_link(ctx, name_of_project, invite_link, no_invites):
     await announce_joiners(ctx, name_of_project, invite_link, no_invites, joiners)
     subtract_balance([ctx.author], no_invites)
     add_balance(joiners, 1)
+
+    ##Turn on link sharing for other people
+    db["sharing_state"] = 0
 
 
 
