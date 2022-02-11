@@ -10,6 +10,7 @@ import asyncio
 discord_bot_token = os.environ['DiscordBotKey']
 bot = commands.Bot(command_prefix="/")
 client = discord.Client()
+sharing_state=0
 
 #Project variables
 starting_balance = 10
@@ -30,6 +31,30 @@ def set_balance(username, balance):
   else:
     db["balances"]={username: balance}
 
+def add_balance(users, amount):
+  if "balances" in db.keys():
+      balances = db["balances"]
+      for user in users:
+        username = user.name + str(user.id)
+        balances[username] += amount
+
+def subtract_balance(users, amount):
+  if "balances" in db.keys():
+      balances = db["balances"]
+      for user in users:
+        username = user.name + str(user.id)
+        balances[username] -= amount
+
+def check_balance(user):
+  username = user.name + str(user.id)
+  if "balances" in db.keys():
+    balances = db["balances"]
+    if username in balances.keys():
+      balance = f'{user.mention}, you have {str(balances[username])} points in the bank'
+    else: balance = "You do not have a bank yet! Try /help"
+  return balance
+
+
 
 def reset_all_balances():
   if "balances" in db.keys():
@@ -42,7 +67,7 @@ def start_new_task(invite_link, no_invites):
     tasks[invite_link] = {"no_invites" : int(no_invites), "users" : []}
     db["tasks"] = tasks
   else:
-    db["tasks"] = {invite_link: {"no_invites" : int(no_invites), "us ers" : []}}
+    db["tasks"] = {invite_link: {"no_invites" : int(no_invites), "users" : []}}
     print("tasks db initialized")
 
 def add_user_to_task(invite_link, user):
@@ -60,12 +85,19 @@ async def print_balances(message):
     await message.channel.send(str(db["balances"]))
 
 @bot.command()
+async def bank(message):
+  if "balances" in db.keys():
+    balance = check_balance(message.author)
+    await message.channel.send(str(balance))
+
+@bot.command()
 async def print_tasks(message):
   if "tasks" in db.keys():
     await message.channel.send(str(db["tasks"]))
 
 @bot.command()
 async def start(message):
+  ###Check if balance not already initialized
   set_balance(message.author.name + str(message.author.id), starting_balance)
   await message.channel.send(
     "Your account is initialized with {0}".format(starting_balance)
@@ -94,6 +126,7 @@ async def share_link(ctx, name_of_project, invite_link, no_invites):
   my_message = await channel.send(embed = give)
   '''
   ##Announcement
+  await ctx.channel.send(f'{ctx.author.mention}')
   sharelinkmessage = discord.Embed(color = 0x2ecc71)
   sharelinkmessage.set_author(name = 'Linkasaurus Bot')
   sharelinkmessage.add_field(
@@ -112,19 +145,24 @@ async def share_link(ctx, name_of_project, invite_link, no_invites):
   reactions_count = reactions.count
 
   while reactions_count < no_invites:
-    await ctx.channel.send(f'There are only {str(reactions_count)} reactions')
     await asyncio.sleep(ticker)
     new_message = await ctx.channel.fetch_message(my_message.id)
+    
     reactions = discord.utils.get(new_message.reactions)
     reactions_count = reactions.count
     '''
     if reactions_count > 0:
-      await my_message.remove_reaction('👍', ctx.author)
+      await my_message.remove_reaction('👍', new_message.author)
     '''
   joiners = await new_message.reactions[0].users().flatten()
   await announce_joiners(ctx, name_of_project, invite_link, no_invites, joiners)
-  
+  subtract_balance([ctx.author], no_invites)
+  add_balance(new_message.reactions[0].users(), 1)
+
+
+#Bot helper functions
 async def announce_joiners(ctx, name_of_project, invite_link, no_invites, joiners):
+  time_to_join =1200
   joiners_string = ""
   for i in range(0, no_invites):
     joiners_string += joiners[i].mention + ", "
@@ -135,12 +173,10 @@ async def announce_joiners(ctx, name_of_project, invite_link, no_invites, joiner
   for i in range(0, no_invites):
     await ctx.channel.send(f'{joiners[i].mention}')
   joiners_info_message = discord.Embed(color = 0x2ecc71)
-  joiners_announce_message.set_author(name = 'Linkasaurus Bot')
-
-  
-
-
-
+  joiners_info_message.set_author(name = 'Linkasaurus Bot')
+  joiners_info_message.add_field(name='INSTRUCTIONS', value=f'You have agreed to join https://discord.gg/{invite_link}. You must do so before {datetime.datetime.utcnow() + datetime.timedelta(seconds = time_to_join)}. Please join now, have a look around, and send some messages! You have recieved 1 point each. Failure to join within the given time will result in you being put on THE NAUGHTY LIST!!!')
+  joiners_info_message.set_footer(text = f'{ctx.author}, please check if all users have joined using your code by the deadline. If not, contact a mod for support.')
+  joiners_info_message = await ctx.channel.send(embed = joiners_info_message)
 
 
 
