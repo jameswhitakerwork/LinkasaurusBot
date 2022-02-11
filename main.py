@@ -16,11 +16,12 @@ import asyncio
 
 #System variables
 discord_bot_token = os.environ['DiscordBotKey']
-bot = commands.Bot(command_prefix="/")
+bot = commands.Bot(command_prefix="!")
 client = discord.Client()
-sharing_state=0
+
 
 #Project variables
+sharing_state=0
 starting_balance = 10
 
 
@@ -31,27 +32,29 @@ async def on_ready():
 
 
 #Database balance adjustments
-def set_balance(user, balance):
+def set_balance(user, amount):
   if "balances" in db.keys():
       balances = db["balances"]
-      balances[str(user.id)] = balance
+      balances[str(user.id)] = int(amount)
       db["balances"] = balances
   else:
-    db["balances"]={user.id: balance}
+    db["balances"]={user.id: int(amount)}
 
 def add_balance(users, amount):
   if "balances" in db.keys():
       balances = db["balances"]
       for user in users:
-        balances[str(user.id)] += amount
+        balances[str(user.id)] += int(amount)
 
 def subtract_balance(users, amount):
   if "balances" in db.keys():
       balances = db["balances"]
       for user in users:
-        balances[str(user.id)] -= amount
+        print(user.id)
+        print(type(user.id))
+        balances[str(user.id)] -= int(amount)
 
-def check_balance(user):
+def check_own_balance(user):
   if "balances" in db.keys():
     balances = db["balances"]
     if str(user.id) in balances.keys():
@@ -64,6 +67,8 @@ def check_balance(user):
 def reset_all_balances():
   if "balances" in db.keys():
     del db["balances"]
+
+
 
 #Invite link task
 def start_new_task(invite_link, no_invites):
@@ -81,28 +86,10 @@ def add_user_to_task(invite_link, user):
     if invite_link in db["tasks"].keys():
       if len(db["tasks"][invite_link]["users"]) < db["tasks"][invite_link]["no_invites"]:
         db["tasks"][invite_link]["users"].append([user])
+
     
 
 #Bot commands
-@bot.command()
-async def print_balances(message):
-  if "balances" in db.keys():
-    await message.channel.send(str(db["balances"]))
-
-@bot.command()
-async def bank(message):
-  await message.channel.send(
-    f"Checking if {message.author.id} is in {db['balances'].keys()}"
-    )
-  if "balances" in db.keys():
-    balance = check_balance(message.author)
-    await message.channel.send(str(balance))
-
-@bot.command()
-async def print_tasks(message):
-  if "tasks" in db.keys():
-    await message.channel.send(str(db["tasks"]))
-
 @bot.command()
 async def start(message):
   ###Check if balance not already initialized
@@ -113,9 +100,10 @@ async def start(message):
   await print_balances(message)
 
 @bot.command()
-async def reset_balances(message):
-    reset_all_balances()
-    await message.channel.send("All balances have been deleted.")
+async def bank(message):
+  if "balances" in db.keys():
+    balance = check_own_balance(message.author)
+    await message.channel.send(str(balance))
 
 @bot.command()
 @commands.has_role("Linkasaurus")
@@ -133,6 +121,7 @@ async def share_link(ctx, name_of_project, invite_link, no_invites):
   give.set_footer(text = f'Giveaway ends at {end} UTC!')
   my_message = await channel.send(embed = give)
   '''
+
   ##Announcement
   await ctx.channel.send(f'{ctx.author.mention}')
   sharelinkmessage = discord.Embed(color = 0x2ecc71)
@@ -162,10 +151,53 @@ async def share_link(ctx, name_of_project, invite_link, no_invites):
     if reactions_count > 0:
       await my_message.remove_reaction('👍', new_message.author)
     '''
+
+  ##Announce joiners and make balance adjustments
   joiners = await new_message.reactions[0].users().flatten()
   await announce_joiners(ctx, name_of_project, invite_link, no_invites, joiners)
   subtract_balance([ctx.author], no_invites)
-  add_balance(new_message.reactions[0].users(), 1)
+  add_balance(joiners, 1)
+
+
+
+
+
+
+#Admin functions
+@bot.command()
+@commands.has_role("Linkasaurus Team")
+async def admin_set_balance(ctx, name, amount):
+  user = ctx.message.guild.get_member_named(name)
+  set_balance(user, amount)
+
+@bot.command()
+@commands.has_role("Linkasaurus Team")
+async def admin_check_balance(ctx, name):
+  user = ctx.message.guild.get_member_named(name)
+  await ctx.channel.send(check_own_balance(user))
+
+@bot.command()
+@commands.has_role("Linkasaurus Team")
+async def admin_print_balances(message):
+  if "balances" in db.keys():
+    await message.channel.send(str(db["balances"]))
+
+@bot.command()
+@commands.has_role("Linkasaurus Team")
+async def admin_print_tasks(message):
+  if "tasks" in db.keys():
+    await message.channel.send(str(db["tasks"]))
+
+@bot.command()
+@commands.has_role("Linkasaurus Team")
+async def admin_reset_balances(message):
+    reset_all_balances()
+    await message.channel.send("All balances have been deleted.")
+  
+
+
+
+
 
 
 #Bot helper functions
@@ -200,6 +232,7 @@ async def start_task(message, invite_link, no_invites):
 @bot.command()
 async def add_user_task(message, invite_link):
   add_user_to_task(invite_link, message.author.name)
+
 
 #Help command
 @bot.command()
