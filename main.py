@@ -1,3 +1,11 @@
+###TODO
+#Fix which channels commands will be send to and link sharing will happen
+#Check triple hash comments for adding functionality
+#Store ID but speak username (don't store username)
+
+
+
+
 #Import packages
 import os
 import discord
@@ -23,34 +31,31 @@ async def on_ready():
 
 
 #Database balance adjustments
-def set_balance(username, balance):
+def set_balance(user, balance):
   if "balances" in db.keys():
       balances = db["balances"]
-      balances[username] = balance
+      balances[str(user.id)] = balance
       db["balances"] = balances
   else:
-    db["balances"]={username: balance}
+    db["balances"]={user.id: balance}
 
 def add_balance(users, amount):
   if "balances" in db.keys():
       balances = db["balances"]
       for user in users:
-        username = user.name + str(user.id)
-        balances[username] += amount
+        balances[str(user.id)] += amount
 
 def subtract_balance(users, amount):
   if "balances" in db.keys():
       balances = db["balances"]
       for user in users:
-        username = user.name + str(user.id)
-        balances[username] -= amount
+        balances[str(user.id)] -= amount
 
 def check_balance(user):
-  username = user.name + str(user.id)
   if "balances" in db.keys():
     balances = db["balances"]
-    if username in balances.keys():
-      balance = f'{user.mention}, you have {str(balances[username])} points in the bank'
+    if str(user.id) in balances.keys():
+      balance = f'{user.mention}, you have {str(balances[str(user.id)])} points in the bank'
     else: balance = "You do not have a bank yet! Try /help"
   return balance
 
@@ -86,6 +91,9 @@ async def print_balances(message):
 
 @bot.command()
 async def bank(message):
+  await message.channel.send(
+    f"Checking if {message.author.id} is in {db['balances'].keys()}"
+    )
   if "balances" in db.keys():
     balance = check_balance(message.author)
     await message.channel.send(str(balance))
@@ -98,7 +106,7 @@ async def print_tasks(message):
 @bot.command()
 async def start(message):
   ###Check if balance not already initialized
-  set_balance(message.author.name + str(message.author.id), starting_balance)
+  set_balance(message.author, starting_balance)
   await message.channel.send(
     "Your account is initialized with {0}".format(starting_balance)
     )
