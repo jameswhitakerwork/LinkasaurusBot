@@ -10,6 +10,7 @@ from discord.ext import commands
 from replit import db
 import datetime
 import asyncio
+from keepalive import keep_alive
 
 #System variables
 discord_bot_token = os.environ['DiscordBotKey']
@@ -18,7 +19,7 @@ client = discord.Client()
 
 
 #Project variables
-starting_balance = 10
+starting_balance = 2
 
 #Channel ID checks
 def channel_bot_commands(ctx):
@@ -113,7 +114,7 @@ async def start(message):
     if str(message.author.id) not in db["balances"].keys():
       set_balance(message.author, starting_balance)
       await message.reply(
-        "Welcome!!! Your account is initialized with {0} points. Get more points by reacting to and joining the links posted in the link-sharing channel. Spend your points to bring other Linkasaurus holders to your invite link using !share_link <name of project> <invite code> <number of people you want to join>. Do !helpme for more info!".format(starting_balance)
+        "Welcome!!! Your account is initialized with {0} points. Get more points by reacting to and joining the links posted in the link-sharing channel. Spend your points to bring other members to your invite link using !sharelink <name of project> <invite code> <number of people you want to join>. Do !helpme for more info!".format(starting_balance)
         )
     else:
       await message.reply(
@@ -129,8 +130,8 @@ async def bank(message):
 
 @bot.command()
 @commands.check(channel_bot_commands)
-@commands.has_role("Linkasaurus")
-async def share_link(ctx, name_of_project, invite_link, no_invites):
+@commands.has_role("Member")
+async def sharelink(ctx, name_of_project, invite_link, no_invites):
   ##Init variables
   ticker=2
   error_state = None
@@ -178,8 +179,8 @@ async def share_link(ctx, name_of_project, invite_link, no_invites):
     my_message = await channel_link_sharing.send(embed = sharelinkmessage)
 
     ##React to the message
-    await my_message.add_reaction('👍')
-    new_message = await channel_link_sharing.fetch_message(my_message.id)
+    ##await my_message.add_reaction('👍')
+    ##new_message = await channel_link_sharing.fetch_message(my_message.id)
 
     ##Check for reactions
     reactions = discord.utils.get(new_message.reactions)
@@ -213,45 +214,53 @@ async def share_link(ctx, name_of_project, invite_link, no_invites):
 #Admin functions
 @bot.command()
 @commands.check(channel_team_bot_commands)
-@commands.has_role("Linkasaurus Team")
+@commands.has_role("Team")
 async def admin_set_balance(ctx, name, amount):
   user = ctx.message.guild.get_member_named(name)
   set_balance(user, amount)
 
 @bot.command()
 @commands.check(channel_team_bot_commands)
-@commands.has_role("Linkasaurus Team")
+@commands.has_role("Team")
 async def admin_check_balance(ctx, name):
   user = ctx.message.guild.get_member_named(name)
   await ctx.reply(check_own_balance(user))
 
 @bot.command()
 @commands.check(channel_team_bot_commands)
-@commands.has_role("Linkasaurus Team")
+@commands.has_role("Team")
 async def admin_print_balances(message):
   if "balances" in db.keys():
     await message.reply(str(db["balances"]))
 
 @bot.command()
 @commands.check(channel_team_bot_commands)
-@commands.has_role("Linkasaurus Team")
+@commands.has_role("Team")
 async def admin_print_tasks(message):
   if "tasks" in db.keys():
     await message.reply(str(db["tasks"]))
 
 @bot.command()
 @commands.check(channel_team_bot_commands)
-@commands.has_role("Linkasaurus Team")
+@commands.has_role("Team")
 async def admin_reset_balances(message):
     reset_all_balances()
     await message.reply("All balances have been deleted.")
 
 @bot.command()
 @commands.check(channel_team_bot_commands)
-@commands.has_role("Linkasaurus Team")
+@commands.has_role("Team")
 async def adjust_db(message, key, value):
     db[key] = value
     await message.reply(f"{key} set to {value}")
+
+@bot.command()
+@commands.check(channel_team_bot_commands)
+@commands.has_role("Team")
+async def kill_last():
+    pass
+
+
   
 
 
@@ -275,7 +284,7 @@ async def announce_joiners(ctx, name_of_project, invite_link, no_invites, joiner
   joiners_info_message = discord.Embed(color = 0x2ecc71)
   joiners_info_message.set_author(name = 'Linkasaurus Bot')
   joiners_info_message.add_field(name='INSTRUCTIONS', value=f'You have agreed to join https://discord.gg/{invite_link}. You must do so before {datetime.datetime.utcnow() + datetime.timedelta(seconds = time_to_join)}. Please join now, have a look around, and send some messages! You have recieved 1 point each. Failure to join within the given time will result in you being put on THE NAUGHTY LIST!!!')
-  joiners_info_message.set_footer(text = f'{ctx.author}, please check if all users have joined using your code by the deadline. If not, contact a mod for support.')
+  joiners_info_message.set_footer(text = f'{ctx.author}, please check if all users have joined using your code by the deadline. If not, open a ticket for support.')
   joiners_info_message = await channel_link_sharing.send(embed = joiners_info_message)
 
 
@@ -286,12 +295,12 @@ async def parrot(message, arg):
   await message.reply(f"Squark! {arg}! Squark!")
 
 @bot.command()
-@commands.has_role("Linkasaurus Team")
+@commands.has_role("Team")
 async def start_task(message, invite_link, no_invites):
   start_new_task(invite_link, int(no_invites))
 
 @bot.command()
-@commands.has_role("Linkasaurus Team")
+@commands.has_role("Team")
 async def add_user_task(message, invite_link):
   add_user_to_task(invite_link, message.author.name)
 
@@ -305,8 +314,9 @@ async def helpme(ctx):
     ghelp.set_author(name = 'Commands/Help', icon_url = '')
     ghelp.add_field(name= '!start', value = 'This is the first command to use, it sets up your bank account and gives you your first points!', inline = False)
     ghelp.add_field(name= '!bank', value = 'Tells you how many points you have in the bank', inline = False)
-    ghelp.add_field(name= '!share_link <name of project> <invite code> <number of people you want to join>', value = 'Spend your points with this command to ask for other Linkosaurus holders to join a discord channel using your invite code. The invite code is the last 8 digits of the invite URL (e.g. discord.gg/e32RPZ42 becomes e32RPZ42). As an example, to invite 5 people to the Stupid Fat Ape Club, type !share_link StupidFatApeClub e32RPZ42 5. You need to have 1 point per person you want to invite in the bank. ', inline = False)
-    ghelp.set_footer(text = 'Use the prefix "g!" before all commands!')
+    ghelp.add_field(name= '!sharelink <name of project> <invite code> <number of people you want to join>', value = 'Spend your points with this command to ask for other members to join a discord channel using your invite code. The invite code is the last 8 digits of the invite URL (e.g. discord.gg/e32RPZ42 becomes e32RPZ42). As an example, to invite 5 people to the Stupid Fat Ape Club, type !sharelink StupidFatApeClub e32RPZ42 5. You need to have 1 point per person you want to invite in the bank. ', inline = False)
+    ghelp.set_footer(text = 'Use the prefix "!" before all commands!')
     await ctx.send(embed = ghelp)
 
+keep_alive()
 bot.run(discord_bot_token)
